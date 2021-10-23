@@ -9,9 +9,9 @@ You are able to customise the GUI to make it either look nicer or provide a litt
 
 As of now the GUI looks like this
 
-#GUI root image
+![Kinematics GUI](images/InvKinGUIRootImg.png?raw=true "Kinematics GUI")
 
-#GUI settings image
+![Settinsg GUI](images/InvKinGUISettingsImg.png?raw=true "Settings GUI")
 
 The functions have been laid out neatly so that it isnt too hard for beginners to use and understand.
 Useful error messages are provided when errors are encountered for easy fixing.
