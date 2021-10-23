@@ -8,6 +8,7 @@ It has been designed to be easily imported into other programs for controlling y
 You are able to customise the GUI to make it either look nicer or provide a little performance boost if you are running on low-power hardware like an RPi.
 
 As of now the GUI looks like this
+
 #GUI root image
 
 #GUI settings image
