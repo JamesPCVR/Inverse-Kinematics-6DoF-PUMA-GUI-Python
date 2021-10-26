@@ -358,11 +358,11 @@ def saveSettings(tell=False, onlysteps=False):
     #collect all settings and perform data type verification
     error = False
     try:
-        msg = 'Inverse Translation'
+        msg = 'Configure Tx, Ty and Tz'
         globalsettings['Inv_t_step'] = float(inverseconfigstepsizet.get())
-        msg = 'Inverse Rotation'
+        msg = 'Configure Rx, Ry and Rz'
         globalsettings['Inv_r_step'] = float(inverseconfigstepsizer.get())
-        msg = 'Forward'
+        msg = 'Configure A1, A2, A3, A4, A5 and A6'
         globalsettings['Fwd_step'] = float(forwardconfigstepsize.get())
         if not onlysteps:
             try:
@@ -408,7 +408,7 @@ def saveSettings(tell=False, onlysteps=False):
                 settingswindow.focus_set()
     except:
         error = True
-        messagebox.showerror('An error occurred', f'Step size "{msg}" must be float')
+        messagebox.showerror('An error occurred', f'"{msg}" must be float')
         root.focus_set()
 
     if not onlysteps:
@@ -858,7 +858,7 @@ def getInverseStepSizeT():
         step = float(inverseconfigstepsizet.get())
         return step
     except:
-        messagebox.showerror('An error occurred', f'Inverse translation step size ({globalsettings["Inv_t_step"]}) must be float')
+        messagebox.showerror('An error occurred', f'"Configure Tx, Ty and Tz" must be float')
 
 #get inverse rotation step size
 def getInverseStepSizeR():
@@ -866,7 +866,7 @@ def getInverseStepSizeR():
         step = float(inverseconfigstepsizer.get())
         return step
     except:
-        messagebox.showerror('An error occurred', f'Inverse rotation step size ({globalsettings["Inv_r_step"]}) must be float')
+        messagebox.showerror('An error occurred', f'"Configure Rx, Ry and Rz" must be float')
 
 #get forward rotation step size
 def getForwardStepSize():
@@ -874,14 +874,14 @@ def getForwardStepSize():
         step = float(forwardconfigstepsize.get())
         return step
     except:
-        messagebox.showerror('An error occurred', f'Forward step size ({globalsettings["Fwd_step"]}) must be float')
+        messagebox.showerror('An error occurred', f'"Configure A1, A2, A3, A4, A5 and A6" must be float')
 
 #change x translation by current step
 def updateTx(scalar):
     try:
         current = float(tx.get())
     except:
-        messagebox.showerror('An error occurred', f'Tx ({tx.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"X Translation" must be float')
     step = getInverseStepSizeT()
     try:
         new = float(current + (step * scalar))
@@ -897,7 +897,7 @@ def updateTy(scalar):
     try:
         current = float(ty.get())
     except:
-        messagebox.showerror('An error occurred', f'Ty ({ty.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"Y Translation" must be float')
     step = getInverseStepSizeT()
     try:
         new = float(current + (step * scalar))
@@ -913,7 +913,7 @@ def updateTz(scalar):
     try:
         current = float(tz.get())
     except:
-        messagebox.showerror('An error occurred', f'Tz ({tz.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"Z Translation" must be float')
     step = getInverseStepSizeT()
     try:
         new = float(current + (step * scalar))
@@ -929,7 +929,7 @@ def updateRx(scalar):
     try:
         current = float(rx.get())
     except:
-        messagebox.showerror('An error occurred', f'Rx ({rx.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"X Rotation" must be float')
     step = getInverseStepSizeR()
     try:
         new = float(current + (step * scalar))
@@ -945,7 +945,7 @@ def updateRy(scalar):
     try:
         current = float(ry.get())
     except:
-        messagebox.showerror('An error occurred', f'Ry ({ry.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"Y Rotation" must be float')
     step = getInverseStepSizeR()
     try:
         new = float(current + (step * scalar))
@@ -961,7 +961,7 @@ def updateRz(scalar):
     try:
         current = float(rz.get())
     except:
-        messagebox.showerror('An error occurred', f'Rz ({rz.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"Z Rotation" must be float')
     step = getInverseStepSizeR()
     try:
         new = float(current + (step * scalar))
@@ -977,7 +977,7 @@ def updateAxis1(scalar):
     try:
         current = float(axis1.get())
     except:
-        messagebox.showerror('An error occurred', f'A1 ({axis1.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"Axis 1" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
@@ -993,7 +993,7 @@ def updateAxis2(scalar):
     try:
         current = float(axis2.get())
     except:
-        messagebox.showerror('An error occurred', f'A2 ({axis2.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"Axis 2" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
@@ -1010,7 +1010,7 @@ def updateAxis3(scalar):
     try:
         current = float(axis3.get())
     except:
-        messagebox.showerror('An error occurred', f'A3 ({axis3.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"Axis 3" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
@@ -1026,7 +1026,7 @@ def updateAxis4(scalar):
     try:
         current = float(axis4.get())
     except:
-        messagebox.showerror('An error occurred', f'A4 ({axis4.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"Axis 4" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
@@ -1042,7 +1042,7 @@ def updateAxis5(scalar):
     try:
         current = float(axis5.get())
     except:
-        messagebox.showerror('An error occurred', f'A5 ({axis5.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"Axis 5" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
@@ -1058,7 +1058,7 @@ def updateAxis6(scalar):
     try:
         current = float(axis6.get())
     except:
-        messagebox.showerror('An error occurred', f'A6 ({axis6.get()}) must be float')
+        messagebox.showerror('An error occurred', f'"Axis 6" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
