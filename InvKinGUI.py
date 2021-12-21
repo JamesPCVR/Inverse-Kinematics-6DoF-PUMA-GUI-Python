@@ -5,8 +5,10 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 from datetime import datetime
-from time import time_ns
+from time import perf_counter
 from PIL import Image, ImageTk
+import InvKin
+import FwdKin
 
 #calculate inverse kinematics
 def calcInverseKinematics():
@@ -15,60 +17,93 @@ def calcInverseKinematics():
     global zdata
     
     updateLog('Calculating inverse kinematics')
-    start = time_ns()
+    start = perf_counter()
+
+    #collect joint lengths
+    jointlengths = np.zeros(6)
+    for i in range(6):
+        jointlengths[i] = globalsettings[f'A{i+1}_length']
+
+    #collect target data
+    position = np.array([float(tx.get()),
+                         float(ty.get()),
+                         float(tz.get()),
+                         float(rx.get()),
+                         float(ry.get()),
+                         float(rz.get())])
     
-    ########## calculation and validation ##########
-    #create dummy data
-    tx.delete(0, END)
-    ty.delete(0, END)
-    tz.delete(0, END)
-    rx.delete(0, END)
-    ry.delete(0, END)
-    rz.delete(0, END)
-    tx.insert(0, '78.0')
-    ty.insert(0, '-133.0')
-    tz.insert(0, '104.0')
-    rx.insert(0, '114.59')
-    ry.insert(0, '-57.30')
-    rz.insert(0, '286.48')
-    raw = ((-56.70, -13.45, 142.47, 720.00, 56.14, 720.00),
-           (0.0, 0.0, 25.53, 47.94, 70.34, 74.17, 78),
-           (0.0, 0.0, -38.88, -72.99, -107.09, -120.05, -133),
-           (0.0, 50.0, 244.52, 153.22, 61.93, 82.96, 104),
-           False)
-    ########## calculation and validation ##########
+    #calculation
+    raw = InvKin.invKin(jointlengths, position)
 
-    angles = raw[0]
-    xdata = raw[1]
-    ydata = raw[2]
-    zdata = raw[3]
-    error = raw[4]
+    if raw:
+        angles = raw[0]
+        xdata = raw[1]
+        ydata = raw[2]
+        zdata = raw[3]
 
-    #erase old data
-    axis1.delete(0, END)
-    axis2.delete(0, END)
-    axis3.delete(0, END)
-    axis4.delete(0, END)
-    axis5.delete(0, END)
-    axis6.delete(0, END)
+        #prepare new data
+        a1angle = round(np.degrees(angles[0]), 2)
+        a2angle = round(np.degrees(angles[1]), 2)
+        a3angle = round(np.degrees(angles[2]), 2)
+        a4angle = round(np.degrees(angles[3]), 2)
+        a5angle = round(np.degrees(angles[4]), 2)
+        a6angle = round(np.degrees(angles[5]), 2)
 
-    #insert new data
-    axis1.insert(0, str(angles[0]))
-    axis2.insert(0, str(angles[1]))
-    axis3.insert(0, str(angles[2]))
-    axis4.insert(0, str(angles[3]))
-    axis5.insert(0, str(angles[4]))
-    axis6.insert(0, str(angles[5]))
+        #validata new data
+        error = False
+        if not (globalsettings['A1_constr_neg'] < a1angle < globalsettings['A1_constr_pos']):
+            error = True
+        elif not (globalsettings['A2_constr_neg'] < a2angle < globalsettings['A2_constr_pos']):
+            error = True
+        elif not (globalsettings['A3_constr_neg'] < a3angle < globalsettings['A3_constr_pos']):
+            error = True
+        elif not (globalsettings['A4_constr_neg'] < a4angle < globalsettings['A4_constr_pos']):
+            error = True
+        elif not (globalsettings['A5_constr_neg'] < a5angle < globalsettings['A5_constr_pos']):
+            error = True
+        elif not (globalsettings['A6_constr_neg'] < a6angle < globalsettings['A6_constr_pos']):
+            error = True
+
+        if error:
+            #finish
+            end = perf_counter()
+            updateLog(f'ERROR occurred in inverse kinematics (took {round((end-start)*1000, 2)}ms)')
+            if bool(globalsettings['Update']):
+                plotData()
+            messagebox.showerror('An error occurred','Angles fall outside constraints')
+        
+        else:
+            #erase old data
+            a1.delete(0, END)
+            a2.delete(0, END)
+            a3.delete(0, END)
+            a4.delete(0, END)
+            a5.delete(0, END)
+            a6.delete(0, END)
+
+            #insert new data
+            a1.insert(0, a1angle)
+            a2.insert(0, a2angle)
+            a3.insert(0, a3angle)
+            a4.insert(0, a4angle)
+            a5.insert(0, a5angle)
+            a6.insert(0, a6angle)
+
+            #finish
+            end = perf_counter()
+            updateLog(f'Inverse kinematics calculated (took {round((end-start)*1000, 2)}ms)')
+            if bool(globalsettings['Update']):
+                plotData()
+            if bool(globalsettings['Automate']) and not error:
+                goToFunc()
     
-    #finish
-    end = time_ns()
-    updateLog(f'Inverse kinematics calculated (took {(end-start)/1000}μs)')
-    if error:
-        messagebox.showerror('An error occurred','Angles fall outside defined constraints\nor destination is too far away')
-    if bool(globalsettings['Update']):
-        plotData()
-    if bool(globalsettings['Automate']) and not error:
-        goToFunc()
+    else:
+        #finish
+        end = perf_counter()
+        updateLog(f'ERROR occurred in inverse kinematics (took {round((end-start)*1000, 2)}ms)')
+        if bool(globalsettings['Update']):
+                plotData()
+        messagebox.showerror('An error occurred','Destination is too far away')
 
 #calculate forward kinematics
 def calcForwardKinematics():
@@ -77,35 +112,29 @@ def calcForwardKinematics():
     global zdata
     
     updateLog('Calculating forward kinematics')
-    start = time_ns()
+    start = perf_counter()
+
+    #collect joint lengths
+    jointlengths = np.zeros(6)
+    for i in range(6):
+        jointlengths[i] = globalsettings[f'A{i+1}_length']
+
+    #collect target data
+    jointangles = np.array([float(a1.get()),
+                            float(a2.get()),
+                            float(a3.get()),
+                            float(a4.get()),
+                            float(a5.get()),
+                            float(a6.get())])
     
-    ########## calculation and validation ##########
-    #create dummy data
-    axis1.delete(0, END)
-    axis2.delete(0, END)
-    axis3.delete(0, END)
-    axis4.delete(0, END)
-    axis5.delete(0, END)
-    axis6.delete(0, END)
-    axis1.insert(0, '46.53')
-    axis2.insert(0, '-6.86')
-    axis3.insert(0, '131.57')
-    axis4.insert(0, '720.0')
-    axis5.insert(0, '41.33')
-    axis6.insert(0, '720.0')
-    raw = ((81, 72, 106, 343.78, -171.89, 57.30),
-           (0.0, 0.0, 16.44, 62.09, 107.74, 94.37, 81.0),
-           (0.0, 0.0, 17.34, 65.50, 113.65, 92.83, 72.0),
-           (0.0, 50.0, 248.57, 173.76, 98.94, 102.47, 106.0),
-           False)
-    ########## calculation and validation ##########
+    #calculation
+    raw = FwdKin.fwdKin(jointlengths, np.radians(jointangles))
 
     positions = raw[0]
     xdata = raw[1]
     ydata = raw[2]
     zdata = raw[3]
-    error = raw[4]
-
+    
     #erase old data
     tx.delete(0, END)
     ty.delete(0, END)
@@ -115,16 +144,16 @@ def calcForwardKinematics():
     rz.delete(0, END)
 
     #insert new data
-    tx.insert(0, str(positions[0]))
-    ty.insert(0, str(positions[1]))
-    tz.insert(0, str(positions[2]))
-    rx.insert(0, str(positions[3]))
-    ry.insert(0, str(positions[4]))
-    rz.insert(0, str(positions[5]))
+    tx.insert(0, round(positions[0], 2))
+    ty.insert(0, round(positions[1], 2))
+    tz.insert(0, round(positions[2], 2))
+    rx.insert(0, round(np.degrees(positions[3]), 2))
+    ry.insert(0, round(np.degrees(positions[4]), 2))
+    rz.insert(0, round(np.degrees(positions[5]), 2))
     
     #finish
-    end = time_ns()
-    updateLog(f'Forward kinematics calculated (took {(end-start)/1000}μs)')
+    end = perf_counter()
+    updateLog(f'Forward kinematics calculated (took {round((end-start)*1000, 2)}ms)')
     if error:
         messagebox.showerror('An error occurred','An error occurred in forward kinematics')
     if bool(globalsettings['Update']):
@@ -145,12 +174,12 @@ def goHome():
     rx.delete(0, END)
     ry.delete(0, END)
     rz.delete(0, END)
-    axis1.delete(0, END)
-    axis2.delete(0, END)
-    axis3.delete(0, END)
-    axis4.delete(0, END)
-    axis5.delete(0, END)
-    axis6.delete(0, END)
+    a1.delete(0, END)
+    a2.delete(0, END)
+    a3.delete(0, END)
+    a4.delete(0, END)
+    a5.delete(0, END)
+    a6.delete(0, END)
 
     #insert new data
     tx.insert(0, str(globalsettings['A3_length']+
@@ -163,12 +192,12 @@ def goHome():
     rx.insert(0, '0.0')
     ry.insert(0, '0.0')
     rz.insert(0, '0.0')
-    axis1.insert(0, '0.0')
-    axis2.insert(0, '0.0')
-    axis3.insert(0, '90.0')
-    axis4.insert(0, '0.0')
-    axis5.insert(0, '0.0')
-    axis6.insert(0, '0.0')
+    a1.insert(0, '0.0')
+    a2.insert(0, '0.0')
+    a3.insert(0, '90.0')
+    a4.insert(0, '0.0')
+    a5.insert(0, '0.0')
+    a6.insert(0, '0.0')
 
     #create plot data
     xpoint1 = globalsettings['A3_length']
@@ -198,29 +227,18 @@ def goToFunc():
             'rx':float(rx.get()),
             'ry':float(ry.get()),
             'rz':float(rz.get()),
-            'a1':float(axis1.get()),
-            'a2':float(axis2.get()),
-            'a3':float(axis3.get()),
-            'a4':float(axis4.get()),
-            'a5':float(axis5.get()),
-            'a6':float(axis6.get()),
+            'a1':float(a1.get()),
+            'a2':float(a2.get()),
+            'a3':float(a3.get()),
+            'a4':float(a4.get()),
+            'a5':float(a5.get()),
+            'a6':float(a6.get()),
             'end':float(endeffectorslider.get())}
     goTo(data)
-
-#only create placeholder function if user has not defined their own
-if 'goTo' not in locals():
-    def goTo(data):
-        print('"goTo" function call')
-        print(data)
 
 def eStopFunc(): #handle eStop button input
     updateLog('Emergency stop')
     eStop()
-
-#only create placeholder function if user has not defined their own
-if 'eStop' not in locals():
-    def eStop(): #Emergency stop
-        print('"eStop" function call')
 
 #plot data onto window
 def plotData():
@@ -298,32 +316,23 @@ def plotOrigin(tx, ty, tz, rx, ry, rz, length):
             (np.sin(rz), np.cos(rz), 0),
             (0, 0, 1))
     rotall = np.matmul(np.matmul(rotz, roty), rotx)
-    xplots = list(map(list, np.matmul(rotall, ((0,length), (0,0), (0,0)))))
-    yplots = list(map(list, np.matmul(rotall, ((0,0), (0,length), (0,0)))))
-    zplots = list(map(list, np.matmul(rotall, ((0,0), (0,0), (0,length)))))
-    xplots[0][0] += tx
-    xplots[0][1] += tx
-    xplots[1][0] += ty
-    xplots[1][1] += ty
-    xplots[2][0] += tz
-    xplots[2][1] += tz
-    yplots[0][0] += tx
-    yplots[0][1] += tx
-    yplots[1][0] += ty
-    yplots[1][1] += ty
-    yplots[2][0] += tz
-    yplots[2][1] += tz
-    zplots[0][0] += tx
-    zplots[0][1] += tx
-    zplots[1][0] += ty
-    zplots[1][1] += ty
-    zplots[2][0] += tz
-    zplots[2][1] += tz
+    xplots = np.matmul(rotall, ((0,length), (0,0), (0,0)))
+    yplots = np.matmul(rotall, ((0,0), (0,length), (0,0)))
+    zplots = np.matmul(rotall, ((0,0), (0,0), (0,length)))
+    xplots[0] += tx
+    xplots[1] += ty
+    xplots[2] += tz
+    yplots[0] += tx
+    yplots[1] += ty
+    yplots[2] += tz
+    zplots[0] += tx
+    zplots[1] += ty
+    zplots[2] += tz
 
     #plot origin
-    ax.plot(xplots[0], xplots[1], xplots[2], c='#ff0000', linewidth=globalsettings['Line_width'])
-    ax.plot(yplots[0], yplots[1], yplots[2], c='#00ff00', linewidth=globalsettings['Line_width'])
-    ax.plot(zplots[0], zplots[1], zplots[2], c='#0000ff', linewidth=globalsettings['Line_width'])    
+    ax.plot(*xplots, c='#ff0000', linewidth=globalsettings['Line_width'])
+    ax.plot(*yplots, c='#00ff00', linewidth=globalsettings['Line_width'])
+    ax.plot(*zplots, c='#0000ff', linewidth=globalsettings['Line_width'])    
 
 #set settings saved in 'settings.txt'
 def setSettings():
@@ -367,37 +376,37 @@ def saveSettings(tell=False, onlysteps=False):
         if not onlysteps:
             try:
                 msg = 'Axis 1 to Axis 2'
-                globalsettings['A1_length'] = float(axis1length.get())
+                globalsettings['A1_length'] = float(a1length.get())
                 msg = 'Axis 2 to Axis 3'
-                globalsettings['A2_length'] = float(axis2length.get())
+                globalsettings['A2_length'] = float(a2length.get())
                 msg = 'Axis 3 to Axis 4'
-                globalsettings['A3_length'] = float(axis3length.get())
+                globalsettings['A3_length'] = float(a3length.get())
                 msg = 'Axis 4 to Axis 5'
-                globalsettings['A4_length'] = float(axis4length.get())
+                globalsettings['A4_length'] = float(a4length.get())
                 msg = 'Axis 5 to Axis 6'
-                globalsettings['A5_length'] = float(axis5length.get())
+                globalsettings['A5_length'] = float(a5length.get())
                 msg = 'Axis 6 to End'
-                globalsettings['A6_length'] = float(axis6length.get())
+                globalsettings['A6_length'] = float(a6length.get())
 
                 try:
                     msg = 'Axis 1'
-                    globalsettings['A1_constr_pos'] = float(axis1constraintpositive.get())
-                    globalsettings['A1_constr_neg'] = float(axis1constraintnegative.get())
+                    globalsettings['A1_constr_pos'] = float(a1constraintpositive.get())
+                    globalsettings['A1_constr_neg'] = float(a1constraintnegative.get())
                     msg = 'Axis 2'
-                    globalsettings['A2_constr_pos'] = float(axis2constraintpositive.get())
-                    globalsettings['A2_constr_neg'] = float(axis2constraintnegative.get())
+                    globalsettings['A2_constr_pos'] = float(a2constraintpositive.get())
+                    globalsettings['A2_constr_neg'] = float(a2constraintnegative.get())
                     msg = 'Axis 3'
-                    globalsettings['A3_constr_pos'] = float(axis3constraintpositive.get())
-                    globalsettings['A3_constr_neg'] = float(axis3constraintnegative.get())
+                    globalsettings['A3_constr_pos'] = float(a3constraintpositive.get())
+                    globalsettings['A3_constr_neg'] = float(a3constraintnegative.get())
                     msg = 'Axis 4'
-                    globalsettings['A4_constr_pos'] = float(axis4constraintpositive.get())
-                    globalsettings['A4_constr_neg'] = float(axis4constraintnegative.get())
+                    globalsettings['A4_constr_pos'] = float(a4constraintpositive.get())
+                    globalsettings['A4_constr_neg'] = float(a4constraintnegative.get())
                     msg = 'Axis 5'
-                    globalsettings['A5_constr_pos'] = float(axis5constraintpositive.get())
-                    globalsettings['A5_constr_neg'] = float(axis5constraintnegative.get())
+                    globalsettings['A5_constr_pos'] = float(a5constraintpositive.get())
+                    globalsettings['A5_constr_neg'] = float(a5constraintnegative.get())
                     msg = 'Axis 6'
-                    globalsettings['A6_constr_pos'] = float(axis6constraintpositive.get())
-                    globalsettings['A6_constr_neg'] = float(axis6constraintnegative.get())
+                    globalsettings['A6_constr_pos'] = float(a6constraintpositive.get())
+                    globalsettings['A6_constr_neg'] = float(a6constraintnegative.get())
                 except:
                     error = True
                     messagebox.showerror('An error occurred', f'Constraint "{msg}" must be float')
@@ -527,47 +536,47 @@ def loadSettings(tell=False, preset=None, save=False):
     inverseconfigstepsizet.delete(0, END)
     inverseconfigstepsizer.delete(0, END)
     forwardconfigstepsize.delete(0, END)
-    axis1length.delete(0, END)
-    axis2length.delete(0, END)
-    axis3length.delete(0, END)
-    axis4length.delete(0, END)
-    axis5length.delete(0, END)
-    axis6length.delete(0, END)
-    axis1constraintpositive.delete(0, END)
-    axis1constraintnegative.delete(0, END)
-    axis2constraintpositive.delete(0, END)
-    axis2constraintnegative.delete(0, END)
-    axis3constraintpositive.delete(0, END)
-    axis3constraintnegative.delete(0, END)
-    axis4constraintpositive.delete(0, END)
-    axis4constraintnegative.delete(0, END)
-    axis5constraintpositive.delete(0, END)
-    axis5constraintnegative.delete(0, END)
-    axis6constraintpositive.delete(0, END)
-    axis6constraintnegative.delete(0, END)
+    a1length.delete(0, END)
+    a2length.delete(0, END)
+    a3length.delete(0, END)
+    a4length.delete(0, END)
+    a5length.delete(0, END)
+    a6length.delete(0, END)
+    a1constraintpositive.delete(0, END)
+    a1constraintnegative.delete(0, END)
+    a2constraintpositive.delete(0, END)
+    a2constraintnegative.delete(0, END)
+    a3constraintpositive.delete(0, END)
+    a3constraintnegative.delete(0, END)
+    a4constraintpositive.delete(0, END)
+    a4constraintnegative.delete(0, END)
+    a5constraintpositive.delete(0, END)
+    a5constraintnegative.delete(0, END)
+    a6constraintpositive.delete(0, END)
+    a6constraintnegative.delete(0, END)
     
     #insert new values
     inverseconfigstepsizet.insert(0, globalsettings['Inv_t_step'])
     inverseconfigstepsizer.insert(0, globalsettings['Inv_r_step'])
     forwardconfigstepsize.insert(0, globalsettings['Fwd_step'])
-    axis1length.insert(0, globalsettings['A1_length'])
-    axis2length.insert(0, globalsettings['A2_length'])
-    axis3length.insert(0, globalsettings['A3_length'])
-    axis4length.insert(0, globalsettings['A4_length'])
-    axis5length.insert(0, globalsettings['A5_length'])
-    axis6length.insert(0, globalsettings['A6_length'])
-    axis1constraintpositive.insert(0, globalsettings['A1_constr_pos'])
-    axis1constraintnegative.insert(0, globalsettings['A1_constr_neg'])
-    axis2constraintpositive.insert(0, globalsettings['A2_constr_pos'])
-    axis2constraintnegative.insert(0, globalsettings['A2_constr_neg'])
-    axis3constraintpositive.insert(0, globalsettings['A3_constr_pos'])
-    axis3constraintnegative.insert(0, globalsettings['A3_constr_neg'])
-    axis4constraintpositive.insert(0, globalsettings['A4_constr_pos'])
-    axis4constraintnegative.insert(0, globalsettings['A4_constr_neg'])
-    axis5constraintpositive.insert(0, globalsettings['A5_constr_pos'])
-    axis5constraintnegative.insert(0, globalsettings['A5_constr_neg'])
-    axis6constraintpositive.insert(0, globalsettings['A6_constr_pos'])
-    axis6constraintnegative.insert(0, globalsettings['A6_constr_neg'])
+    a1length.insert(0, globalsettings['A1_length'])
+    a2length.insert(0, globalsettings['A2_length'])
+    a3length.insert(0, globalsettings['A3_length'])
+    a4length.insert(0, globalsettings['A4_length'])
+    a5length.insert(0, globalsettings['A5_length'])
+    a6length.insert(0, globalsettings['A6_length'])
+    a1constraintpositive.insert(0, globalsettings['A1_constr_pos'])
+    a1constraintnegative.insert(0, globalsettings['A1_constr_neg'])
+    a2constraintpositive.insert(0, globalsettings['A2_constr_pos'])
+    a2constraintnegative.insert(0, globalsettings['A2_constr_neg'])
+    a3constraintpositive.insert(0, globalsettings['A3_constr_pos'])
+    a3constraintnegative.insert(0, globalsettings['A3_constr_neg'])
+    a4constraintpositive.insert(0, globalsettings['A4_constr_pos'])
+    a4constraintnegative.insert(0, globalsettings['A4_constr_neg'])
+    a5constraintpositive.insert(0, globalsettings['A5_constr_pos'])
+    a5constraintnegative.insert(0, globalsettings['A5_constr_neg'])
+    a6constraintpositive.insert(0, globalsettings['A6_constr_pos'])
+    a6constraintnegative.insert(0, globalsettings['A6_constr_neg'])
     markersize.set(globalsettings['Marker_size'])
     linewidth.set(globalsettings['Line_width'])
     showorigin.select() if globalsettings['Show_origins'] == 1 else showorigin.deselect()
@@ -595,24 +604,24 @@ def loadSettings(tell=False, preset=None, save=False):
 #open settings window
 def openSettingsWindow():
     global settingswindow
-    global axis1length
-    global axis2length
-    global axis3length
-    global axis4length
-    global axis5length
-    global axis6length
-    global axis1constraintpositive
-    global axis1constraintnegative
-    global axis2constraintpositive
-    global axis2constraintnegative
-    global axis3constraintpositive
-    global axis3constraintnegative
-    global axis4constraintpositive
-    global axis4constraintnegative
-    global axis5constraintpositive
-    global axis5constraintnegative
-    global axis6constraintpositive
-    global axis6constraintnegative
+    global a1length
+    global a2length
+    global a3length
+    global a4length
+    global a5length
+    global a6length
+    global a1constraintpositive
+    global a1constraintnegative
+    global a2constraintpositive
+    global a2constraintnegative
+    global a3constraintpositive
+    global a3constraintnegative
+    global a4constraintpositive
+    global a4constraintnegative
+    global a5constraintpositive
+    global a5constraintnegative
+    global a6constraintpositive
+    global a6constraintnegative
     global markersize
     global linewidth
     global showoriginstate
@@ -650,49 +659,49 @@ def openSettingsWindow():
     presetsframe = LabelFrame(master=settingswindow, text='Presets')
 
     #create settings widgets
-    axis1lengthlabel = Label(master=lengthsframe, text='Axis 1 to Axis 2')
-    axis2lengthlabel = Label(master=lengthsframe, text='Axis 2 to Axis 3')
-    axis3lengthlabel = Label(master=lengthsframe, text='Axis 3 to Axis 4')
-    axis4lengthlabel = Label(master=lengthsframe, text='Axis 4 to Axis 5')
-    axis5lengthlabel = Label(master=lengthsframe, text='Axis 5 to Axis 6')
-    axis6lengthlabel = Label(master=lengthsframe, text='Axis 6 to end')
-    axis1length = Entry(master=lengthsframe, bg='#ffaaaa', width=10, justify=RIGHT)
-    axis2length = Entry(master=lengthsframe, bg='#aaffaa', width=10, justify=RIGHT)
-    axis3length = Entry(master=lengthsframe, bg='#aaaaff', width=10, justify=RIGHT)
-    axis4length = Entry(master=lengthsframe, bg='#ffaaff', width=10, justify=RIGHT)
-    axis5length = Entry(master=lengthsframe, bg='#ffffaa', width=10, justify=RIGHT)
-    axis6length = Entry(master=lengthsframe, bg='#aaffff', width=10, justify=RIGHT)
-    axis1lengthsunit = Label(master=lengthsframe, text='mm')
-    axis2lengthsunit = Label(master=lengthsframe, text='mm')
-    axis3lengthsunit = Label(master=lengthsframe, text='mm')
-    axis4lengthsunit = Label(master=lengthsframe, text='mm')
-    axis5lengthsunit = Label(master=lengthsframe, text='mm')
-    axis6lengthsunit = Label(master=lengthsframe, text='mm')
+    a1lengthlabel = Label(master=lengthsframe, text='Axis 1 to Axis 2')
+    a2lengthlabel = Label(master=lengthsframe, text='Axis 2 to Axis 3')
+    a3lengthlabel = Label(master=lengthsframe, text='Axis 3 to Axis 4')
+    a4lengthlabel = Label(master=lengthsframe, text='Axis 4 to Axis 5')
+    a5lengthlabel = Label(master=lengthsframe, text='Axis 5 to Axis 6')
+    a6lengthlabel = Label(master=lengthsframe, text='Axis 6 to end')
+    a1length = Entry(master=lengthsframe, bg='#ffaaaa', width=10, justify=RIGHT)
+    a2length = Entry(master=lengthsframe, bg='#aaffaa', width=10, justify=RIGHT)
+    a3length = Entry(master=lengthsframe, bg='#aaaaff', width=10, justify=RIGHT)
+    a4length = Entry(master=lengthsframe, bg='#ffaaff', width=10, justify=RIGHT)
+    a5length = Entry(master=lengthsframe, bg='#ffffaa', width=10, justify=RIGHT)
+    a6length = Entry(master=lengthsframe, bg='#aaffff', width=10, justify=RIGHT)
+    a1lengthsunit = Label(master=lengthsframe, text='mm')
+    a2lengthsunit = Label(master=lengthsframe, text='mm')
+    a3lengthsunit = Label(master=lengthsframe, text='mm')
+    a4lengthsunit = Label(master=lengthsframe, text='mm')
+    a5lengthsunit = Label(master=lengthsframe, text='mm')
+    a6lengthsunit = Label(master=lengthsframe, text='mm')
 
-    axis1constraintlabel = Label(master=constraintsframe, text='Axis 1')
-    axis2constraintlabel = Label(master=constraintsframe, text='Axis 2')
-    axis3constraintlabel = Label(master=constraintsframe, text='Axis 3')
-    axis4constraintlabel = Label(master=constraintsframe, text='Axis 4')
-    axis5constraintlabel = Label(master=constraintsframe, text='Axis 5')
-    axis6constraintlabel = Label(master=constraintsframe, text='Axis 6')
-    axis1constraintpositive = Entry(master=constraintsframe, bg='#ffaaaa', width=6, justify=RIGHT)
-    axis1constraintnegative = Entry(master=constraintsframe, bg='#ff6666', width=6, justify=RIGHT)
-    axis2constraintpositive = Entry(master=constraintsframe, bg='#aaffaa', width=6, justify=RIGHT)
-    axis2constraintnegative = Entry(master=constraintsframe, bg='#66ff66', width=6, justify=RIGHT)
-    axis3constraintpositive = Entry(master=constraintsframe, bg='#aaaaff', width=6, justify=RIGHT)
-    axis3constraintnegative = Entry(master=constraintsframe, bg='#6666ff', width=6, justify=RIGHT)
-    axis4constraintpositive = Entry(master=constraintsframe, bg='#ffaaff', width=6, justify=RIGHT)
-    axis4constraintnegative = Entry(master=constraintsframe, bg='#ff66ff', width=6, justify=RIGHT)
-    axis5constraintpositive = Entry(master=constraintsframe, bg='#ffffaa', width=6, justify=RIGHT)
-    axis5constraintnegative = Entry(master=constraintsframe, bg='#ffff66', width=6, justify=RIGHT)
-    axis6constraintpositive = Entry(master=constraintsframe, bg='#aaffff', width=6, justify=RIGHT)
-    axis6constraintnegative = Entry(master=constraintsframe, bg='#66ffff', width=6, justify=RIGHT)
-    axis1constraintsunit = Label(master=constraintsframe, text='deg')
-    axis2constraintsunit = Label(master=constraintsframe, text='deg')
-    axis3constraintsunit = Label(master=constraintsframe, text='deg')
-    axis4constraintsunit = Label(master=constraintsframe, text='deg')
-    axis5constraintsunit = Label(master=constraintsframe, text='deg')
-    axis6constraintsunit = Label(master=constraintsframe, text='deg')
+    a1constraintlabel = Label(master=constraintsframe, text='Axis 1')
+    a2constraintlabel = Label(master=constraintsframe, text='Axis 2')
+    a3constraintlabel = Label(master=constraintsframe, text='Axis 3')
+    a4constraintlabel = Label(master=constraintsframe, text='Axis 4')
+    a5constraintlabel = Label(master=constraintsframe, text='Axis 5')
+    a6constraintlabel = Label(master=constraintsframe, text='Axis 6')
+    a1constraintpositive = Entry(master=constraintsframe, bg='#ffaaaa', width=6, justify=RIGHT)
+    a1constraintnegative = Entry(master=constraintsframe, bg='#ff6666', width=6, justify=RIGHT)
+    a2constraintpositive = Entry(master=constraintsframe, bg='#aaffaa', width=6, justify=RIGHT)
+    a2constraintnegative = Entry(master=constraintsframe, bg='#66ff66', width=6, justify=RIGHT)
+    a3constraintpositive = Entry(master=constraintsframe, bg='#aaaaff', width=6, justify=RIGHT)
+    a3constraintnegative = Entry(master=constraintsframe, bg='#6666ff', width=6, justify=RIGHT)
+    a4constraintpositive = Entry(master=constraintsframe, bg='#ffaaff', width=6, justify=RIGHT)
+    a4constraintnegative = Entry(master=constraintsframe, bg='#ff66ff', width=6, justify=RIGHT)
+    a5constraintpositive = Entry(master=constraintsframe, bg='#ffffaa', width=6, justify=RIGHT)
+    a5constraintnegative = Entry(master=constraintsframe, bg='#ffff66', width=6, justify=RIGHT)
+    a6constraintpositive = Entry(master=constraintsframe, bg='#aaffff', width=6, justify=RIGHT)
+    a6constraintnegative = Entry(master=constraintsframe, bg='#66ffff', width=6, justify=RIGHT)
+    a1constraintsunit = Label(master=constraintsframe, text='deg')
+    a2constraintsunit = Label(master=constraintsframe, text='deg')
+    a3constraintsunit = Label(master=constraintsframe, text='deg')
+    a4constraintsunit = Label(master=constraintsframe, text='deg')
+    a5constraintsunit = Label(master=constraintsframe, text='deg')
+    a6constraintsunit = Label(master=constraintsframe, text='deg')
     
     markersizelabel = Label(master=preferencesframe, text='Marker size')
     markersize = Scale(master=preferencesframe, from_=1, to=8, orient=HORIZONTAL)
@@ -760,49 +769,49 @@ def openSettingsWindow():
     presetsframe.grid(row=3, column=1, padx=8, pady=8, sticky=N+S+E+W)
 
     #pack settings widgets
-    axis1lengthlabel.grid(row=0, column=0, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
-    axis2lengthlabel.grid(row=0, column=2, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
-    axis3lengthlabel.grid(row=0, column=4, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
-    axis4lengthlabel.grid(row=0, column=6, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
-    axis5lengthlabel.grid(row=0, column=8, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
-    axis6lengthlabel.grid(row=0, column=10, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
-    axis1length.grid(row=1, column=0, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis2length.grid(row=1, column=2, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis3length.grid(row=1, column=4, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis4length.grid(row=1, column=6, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis5length.grid(row=1, column=8, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis6length.grid(row=1, column=10, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis1lengthsunit.grid(row=1, column=1, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
-    axis2lengthsunit.grid(row=1, column=3, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
-    axis3lengthsunit.grid(row=1, column=5, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
-    axis4lengthsunit.grid(row=1, column=7, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
-    axis5lengthsunit.grid(row=1, column=9, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
-    axis6lengthsunit.grid(row=1, column=11, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a1lengthlabel.grid(row=0, column=0, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
+    a2lengthlabel.grid(row=0, column=2, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
+    a3lengthlabel.grid(row=0, column=4, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
+    a4lengthlabel.grid(row=0, column=6, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
+    a5lengthlabel.grid(row=0, column=8, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
+    a6lengthlabel.grid(row=0, column=10, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
+    a1length.grid(row=1, column=0, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a2length.grid(row=1, column=2, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a3length.grid(row=1, column=4, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a4length.grid(row=1, column=6, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a5length.grid(row=1, column=8, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a6length.grid(row=1, column=10, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a1lengthsunit.grid(row=1, column=1, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a2lengthsunit.grid(row=1, column=3, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a3lengthsunit.grid(row=1, column=5, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a4lengthsunit.grid(row=1, column=7, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a5lengthsunit.grid(row=1, column=9, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a6lengthsunit.grid(row=1, column=11, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
 
-    axis1constraintlabel.grid(row=0, column=0, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
-    axis2constraintlabel.grid(row=0, column=3, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
-    axis3constraintlabel.grid(row=0, column=6, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
-    axis4constraintlabel.grid(row=0, column=9, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
-    axis5constraintlabel.grid(row=0, column=12, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
-    axis6constraintlabel.grid(row=0, column=15, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
-    axis1constraintpositive.grid(row=1, column=1, padx=0, pady=(0,8), sticky=N+S+E+W)
-    axis1constraintnegative.grid(row=1, column=0, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis2constraintpositive.grid(row=1, column=4, padx=0, pady=(0,8), sticky=N+S+E+W)
-    axis2constraintnegative.grid(row=1, column=3, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis3constraintpositive.grid(row=1, column=7, padx=0, pady=(0,8), sticky=N+S+E+W)
-    axis3constraintnegative.grid(row=1, column=6, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis4constraintpositive.grid(row=1, column=10, padx=0, pady=(0,8), sticky=N+S+E+W)
-    axis4constraintnegative.grid(row=1, column=9, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis5constraintpositive.grid(row=1, column=13, padx=0, pady=(0,8), sticky=N+S+E+W)
-    axis5constraintnegative.grid(row=1, column=12, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis6constraintpositive.grid(row=1, column=16, padx=0, pady=(0,8), sticky=N+S+E+W)
-    axis6constraintnegative.grid(row=1, column=15, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
-    axis1constraintsunit.grid(row=1, column=2, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
-    axis2constraintsunit.grid(row=1, column=5, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
-    axis3constraintsunit.grid(row=1, column=8, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
-    axis4constraintsunit.grid(row=1, column=11, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
-    axis5constraintsunit.grid(row=1, column=14, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
-    axis6constraintsunit.grid(row=1, column=17, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a1constraintlabel.grid(row=0, column=0, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
+    a2constraintlabel.grid(row=0, column=3, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
+    a3constraintlabel.grid(row=0, column=6, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
+    a4constraintlabel.grid(row=0, column=9, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
+    a5constraintlabel.grid(row=0, column=12, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
+    a6constraintlabel.grid(row=0, column=15, padx=8, pady=8, sticky=N+S+E+W, columnspan=3)
+    a1constraintpositive.grid(row=1, column=1, padx=0, pady=(0,8), sticky=N+S+E+W)
+    a1constraintnegative.grid(row=1, column=0, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a2constraintpositive.grid(row=1, column=4, padx=0, pady=(0,8), sticky=N+S+E+W)
+    a2constraintnegative.grid(row=1, column=3, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a3constraintpositive.grid(row=1, column=7, padx=0, pady=(0,8), sticky=N+S+E+W)
+    a3constraintnegative.grid(row=1, column=6, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a4constraintpositive.grid(row=1, column=10, padx=0, pady=(0,8), sticky=N+S+E+W)
+    a4constraintnegative.grid(row=1, column=9, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a5constraintpositive.grid(row=1, column=13, padx=0, pady=(0,8), sticky=N+S+E+W)
+    a5constraintnegative.grid(row=1, column=12, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a6constraintpositive.grid(row=1, column=16, padx=0, pady=(0,8), sticky=N+S+E+W)
+    a6constraintnegative.grid(row=1, column=15, padx=(8,0), pady=(0,8), sticky=N+S+E+W)
+    a1constraintsunit.grid(row=1, column=2, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a2constraintsunit.grid(row=1, column=5, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a3constraintsunit.grid(row=1, column=8, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a4constraintsunit.grid(row=1, column=11, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a5constraintsunit.grid(row=1, column=14, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
+    a6constraintsunit.grid(row=1, column=17, padx=(0,8), pady=(0,8), sticky=N+S+E+W)
     
     markersizelabel.grid(row=0, column=0, padx=8, pady=(8,0), sticky=N+S+E+W)
     markersize.grid(row=1, column=0, padx=8, pady=(0,8), sticky=N+S+E+W)
@@ -973,97 +982,96 @@ def updateRz(scalar):
         plotData()
 
 #change axis 1 angle by current step
-def updateAxis1(scalar):
+def updateA1(scalar):
     try:
-        current = float(axis1.get())
+        current = float(a1.get())
     except:
         messagebox.showerror('An error occurred', f'"Axis 1" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
-        axis1.delete(0, END)
-        axis1.insert(0, new)
+        a1.delete(0, END)
+        a1.insert(0, new)
     except Exception:
         pass
     if bool(globalsettings['Update']):
         plotData()
 
 #change axis 2 angle by current step
-def updateAxis2(scalar):
+def updateA2(scalar):
     try:
-        current = float(axis2.get())
+        current = float(a2.get())
     except:
         messagebox.showerror('An error occurred', f'"Axis 2" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
-        globalposdata['a2'] = new
-        axis2.delete(0, END)
-        axis2.insert(0, new)
+        a2.delete(0, END)
+        a2.insert(0, new)
     except Exception:
         pass
     if bool(globalsettings['Update']):
         plotData()
 
 #change axis 3 angle by current step
-def updateAxis3(scalar):
+def updateA3(scalar):
     try:
-        current = float(axis3.get())
+        current = float(a3.get())
     except:
         messagebox.showerror('An error occurred', f'"Axis 3" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
-        axis3.delete(0, END)
-        axis3.insert(0, new)
+        a3.delete(0, END)
+        a3.insert(0, new)
     except Exception:
         pass
     if bool(globalsettings['Update']):
         plotData()
 
 #change axis 4 angle by current step
-def updateAxis4(scalar):
+def updateA4(scalar):
     try:
-        current = float(axis4.get())
+        current = float(a4.get())
     except:
         messagebox.showerror('An error occurred', f'"Axis 4" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
-        axis4.delete(0, END)
-        axis4.insert(0, new)
+        a4.delete(0, END)
+        a4.insert(0, new)
     except Exception:
         pass
     if bool(globalsettings['Update']):
         plotData()
 
 #change axis 5 angle by current step
-def updateAxis5(scalar):
+def updateA5(scalar):
     try:
-        current = float(axis5.get())
+        current = float(a5.get())
     except:
         messagebox.showerror('An error occurred', f'"Axis 5" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
-        axis5.delete(0, END)
-        axis5.insert(0, new)
+        a5.delete(0, END)
+        a5.insert(0, new)
     except Exception:
         pass
     if bool(globalsettings['Update']):
         plotData()
 
 #change axis 5 angle by current step
-def updateAxis6(scalar):
+def updateA6(scalar):
     try:
-        current = float(axis6.get())
+        current = float(a6.get())
     except:
         messagebox.showerror('An error occurred', f'"Axis 6" must be float')
     step = getForwardStepSize()
     try:
         new = float(current + (step * scalar))
-        axis6.delete(0, END)
-        axis6.insert(0, new)
+        a6.delete(0, END)
+        a6.insert(0, new)
     except Exception:
         pass
     if bool(globalsettings['Update']):
@@ -1095,16 +1103,30 @@ def openMainWindow():
     global rx
     global ry
     global rz
-    global axis1
-    global axis2
-    global axis3
-    global axis4
-    global axis5
-    global axis6
+    global a1
+    global a2
+    global a3
+    global a4
+    global a5
+    global a6
     global endeffectorslider
     global passdatabutton
     global updateplotbutton
     global logtext
+    
+    global goTo
+    global eStop
+
+    #only create placeholder function if user has not defined their own
+    if 'goTo' not in locals():
+        def goTo(data):
+            print('"goTo" function call')
+            print(data)
+
+    #only create placeholder function if user has not defined their own
+    if 'eStop' not in locals():
+        def eStop(): #Emergency stop
+            print('"eStop" function call')
 
     #load saved settings
     setSettings()
@@ -1185,30 +1207,30 @@ def openMainWindow():
     forwardconfigframe = LabelFrame(master=forwardframe, text='Configure A1, A2, A3, A4, A5, and A6')
 
     #create forward kinematics widgets
-    forwardup1 = Button(master=forwardframe1, text='Increment', bg='#ffaaaa', command=lambda: updateAxis1(1))
-    forwardup2 = Button(master=forwardframe2, text='Increment', bg='#aaffaa', command=lambda: updateAxis2(1))
-    forwardup3 = Button(master=forwardframe3, text='Increment', bg='#aaaaff', command=lambda: updateAxis3(1))
-    forwardup4 = Button(master=forwardframe4, text='Increment', bg='#ffaaff', command=lambda: updateAxis4(1))
-    forwardup5 = Button(master=forwardframe5, text='Increment', bg='#ffffaa', command=lambda: updateAxis5(1))
-    forwardup6 = Button(master=forwardframe6, text='Increment', bg='#aaffff', command=lambda: updateAxis6(1))
-    axis1 = Entry(master=forwardframe1, width=10, justify=RIGHT)
-    axis2 = Entry(master=forwardframe2, width=10, justify=RIGHT)
-    axis3 = Entry(master=forwardframe3, width=10, justify=RIGHT)
-    axis4 = Entry(master=forwardframe4, width=10, justify=RIGHT)
-    axis5 = Entry(master=forwardframe5, width=10, justify=RIGHT)
-    axis6 = Entry(master=forwardframe6, width=10, justify=RIGHT)
-    axis1unit = Label(master=forwardframe1, text='deg')
-    axis2unit = Label(master=forwardframe2, text='deg')
-    axis3unit = Label(master=forwardframe3, text='deg')
-    axis4unit = Label(master=forwardframe4, text='deg')
-    axis5unit = Label(master=forwardframe5, text='deg')
-    axis6unit = Label(master=forwardframe6, text='deg')
-    forwarddown1 = Button(master=forwardframe1, text='Decrement', bg='#ff6666', command=lambda: updateAxis1(-1))
-    forwarddown2 = Button(master=forwardframe2, text='Decrement', bg='#66ff66', command=lambda: updateAxis2(-1))
-    forwarddown3 = Button(master=forwardframe3, text='Decrement', bg='#6666ff', command=lambda: updateAxis3(-1))
-    forwarddown4 = Button(master=forwardframe4, text='Decrement', bg='#ff66ff', command=lambda: updateAxis4(-1))
-    forwarddown5 = Button(master=forwardframe5, text='Decrement', bg='#ffff66', command=lambda: updateAxis5(-1))
-    forwarddown6 = Button(master=forwardframe6, text='Decrement', bg='#aaffff', command=lambda: updateAxis6(-1))
+    forwardup1 = Button(master=forwardframe1, text='Increment', bg='#ffaaaa', command=lambda: updateA1(1))
+    forwardup2 = Button(master=forwardframe2, text='Increment', bg='#aaffaa', command=lambda: updateA2(1))
+    forwardup3 = Button(master=forwardframe3, text='Increment', bg='#aaaaff', command=lambda: updateA3(1))
+    forwardup4 = Button(master=forwardframe4, text='Increment', bg='#ffaaff', command=lambda: updateA4(1))
+    forwardup5 = Button(master=forwardframe5, text='Increment', bg='#ffffaa', command=lambda: updateA5(1))
+    forwardup6 = Button(master=forwardframe6, text='Increment', bg='#aaffff', command=lambda: updateA6(1))
+    a1 = Entry(master=forwardframe1, width=10, justify=RIGHT)
+    a2 = Entry(master=forwardframe2, width=10, justify=RIGHT)
+    a3 = Entry(master=forwardframe3, width=10, justify=RIGHT)
+    a4 = Entry(master=forwardframe4, width=10, justify=RIGHT)
+    a5 = Entry(master=forwardframe5, width=10, justify=RIGHT)
+    a6 = Entry(master=forwardframe6, width=10, justify=RIGHT)
+    a1unit = Label(master=forwardframe1, text='deg')
+    a2unit = Label(master=forwardframe2, text='deg')
+    a3unit = Label(master=forwardframe3, text='deg')
+    a4unit = Label(master=forwardframe4, text='deg')
+    a5unit = Label(master=forwardframe5, text='deg')
+    a6unit = Label(master=forwardframe6, text='deg')
+    forwarddown1 = Button(master=forwardframe1, text='Decrement', bg='#ff6666', command=lambda: updateA1(-1))
+    forwarddown2 = Button(master=forwardframe2, text='Decrement', bg='#66ff66', command=lambda: updateA2(-1))
+    forwarddown3 = Button(master=forwardframe3, text='Decrement', bg='#6666ff', command=lambda: updateA3(-1))
+    forwarddown4 = Button(master=forwardframe4, text='Decrement', bg='#ff66ff', command=lambda: updateA4(-1))
+    forwarddown5 = Button(master=forwardframe5, text='Decrement', bg='#ffff66', command=lambda: updateA5(-1))
+    forwarddown6 = Button(master=forwardframe6, text='Decrement', bg='#aaffff', command=lambda: updateA6(-1))
     forwardconfiglabel1 = Label(master=forwardconfigframe, text='Increment / Decrement in')
     forwardconfigstepsize = Entry(master=forwardconfigframe, width=8, justify=RIGHT)
     forwardconfigstepsize.insert(END, globalsettings['Fwd_step'])
@@ -1216,12 +1238,12 @@ def openMainWindow():
     forwardconfigsave = Button(master=forwardconfigframe, text='Save', width=10, command=lambda: saveSettings(True, True))
 
     #assign forwards kinematics defaults
-    axis1.insert(0, 0.0)
-    axis2.insert(0, 0.0)
-    axis3.insert(0, 0.0)
-    axis4.insert(0, 0.0)
-    axis5.insert(0, 0.0)
-    axis6.insert(0, 0.0)
+    a1.insert(0, 0.0)
+    a2.insert(0, 0.0)
+    a3.insert(0, 0.0)
+    a4.insert(0, 0.0)
+    a5.insert(0, 0.0)
+    a6.insert(0, 0.0)
 
     #create controls frame
     controlsframe = LabelFrame(master=root, text='Control')
@@ -1374,18 +1396,18 @@ def openMainWindow():
     forwardup4.grid(row=0, column=0, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
     forwardup5.grid(row=0, column=0, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
     forwardup6.grid(row=0, column=0, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
-    axis1.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
-    axis2.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
-    axis3.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
-    axis4.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
-    axis5.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
-    axis6.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
-    axis1unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
-    axis2unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
-    axis3unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
-    axis4unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
-    axis5unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
-    axis6unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
+    a1.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
+    a2.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
+    a3.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
+    a4.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
+    a5.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
+    a6.grid(row=1, column=0, padx=(8,0), pady=0, sticky=N+S+E+W)
+    a1unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
+    a2unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
+    a3unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
+    a4unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
+    a5unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
+    a6unit.grid(row=1, column=1, padx=(0,8), pady=0, sticky=N+S+E+W)
     forwarddown1.grid(row=2, column=0, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
     forwarddown2.grid(row=2, column=0, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
     forwarddown3.grid(row=2, column=0, padx=8, pady=8, sticky=N+S+E+W, columnspan=2)
