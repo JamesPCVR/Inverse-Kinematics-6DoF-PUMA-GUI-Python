@@ -154,8 +154,6 @@ def calcForwardKinematics():
     #finish
     end = perf_counter()
     updateLog(f'Forward kinematics calculated (took {round((end-start)*1000, 2)}ms)')
-    if error:
-        messagebox.showerror('An error occurred','An error occurred in forward kinematics')
     if bool(globalsettings['Update']):
         plotData()
     if bool(globalsettings['Automate']) and not error:
