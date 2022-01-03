@@ -114,50 +114,74 @@ def calcForwardKinematics():
     updateLog('Calculating forward kinematics')
     start = perf_counter()
 
-    #collect joint lengths
-    jointlengths = np.zeros(6)
-    for i in range(6):
-        jointlengths[i] = globalsettings[f'A{i+1}_length']
+    #validate incoming data
+    error = False
+    if not (globalsettings['A1_constr_neg'] < globalsettings[f'A1_length'] < globalsettings['A1_constr_pos']):
+        error = True
+    elif not (globalsettings['A2_constr_neg'] < globalsettings[f'A2_length'] < globalsettings['A2_constr_pos']):
+        error = True
+    elif not (globalsettings['A3_constr_neg'] < globalsettings[f'A3_length'] < globalsettings['A3_constr_pos']):
+        error = True
+    elif not (globalsettings['A4_constr_neg'] < globalsettings[f'A4_length'] < globalsettings['A4_constr_pos']):
+        error = True
+    elif not (globalsettings['A5_constr_neg'] < globalsettings[f'A5_length'] < globalsettings['A5_constr_pos']):
+        error = True
+    elif not (globalsettings['A6_constr_neg'] < globalsettings[f'A6_length'] < globalsettings['A6_constr_pos']):
+        error = True
 
-    #collect target data
-    jointangles = np.array([float(a1.get()),
-                            float(a2.get()),
-                            float(a3.get()),
-                            float(a4.get()),
-                            float(a5.get()),
-                            float(a6.get())])
+    if error:
+        #finish
+        end = perf_counter()
+        updateLog(f'ERROR occurred in forward kinematics (took {round((end-start)*1000, 2)}ms)')
+        if bool(globalsettings['Update']):
+            plotData()
+        messagebox.showerror('An error occurred','Angles fall outside constraints')
     
-    #calculation
-    raw = FwdKin.fwdKin(jointlengths, np.radians(jointangles))
+    else:
+        #collect joint lengths
+        jointlengths = np.zeros(6)
+        for i in range(6):
+            jointlengths[i] = globalsettings[f'A{i+1}_length']
 
-    positions = raw[0]
-    xdata = raw[1]
-    ydata = raw[2]
-    zdata = raw[3]
-    
-    #erase old data
-    tx.delete(0, END)
-    ty.delete(0, END)
-    tz.delete(0, END)
-    rx.delete(0, END)
-    ry.delete(0, END)
-    rz.delete(0, END)
+        #collect target data
+        jointangles = np.array([float(a1.get()),
+                                float(a2.get()),
+                                float(a3.get()),
+                                float(a4.get()),
+                                float(a5.get()),
+                                float(a6.get())])
+        
+        #calculation
+        raw = FwdKin.fwdKin(jointlengths, np.radians(jointangles))
 
-    #insert new data
-    tx.insert(0, round(positions[0], 2))
-    ty.insert(0, round(positions[1], 2))
-    tz.insert(0, round(positions[2], 2))
-    rx.insert(0, round(np.degrees(positions[3]), 2))
-    ry.insert(0, round(np.degrees(positions[4]), 2))
-    rz.insert(0, round(np.degrees(positions[5]), 2))
-    
-    #finish
-    end = perf_counter()
-    updateLog(f'Forward kinematics calculated (took {round((end-start)*1000, 2)}ms)')
-    if bool(globalsettings['Update']):
-        plotData()
-    if bool(globalsettings['Automate']) and not error:
-        goToFunc()
+        positions = raw[0]
+        xdata = raw[1]
+        ydata = raw[2]
+        zdata = raw[3]
+        
+        #erase old data
+        tx.delete(0, END)
+        ty.delete(0, END)
+        tz.delete(0, END)
+        rx.delete(0, END)
+        ry.delete(0, END)
+        rz.delete(0, END)
+
+        #insert new data
+        tx.insert(0, round(positions[0], 2))
+        ty.insert(0, round(positions[1], 2))
+        tz.insert(0, round(positions[2], 2))
+        rx.insert(0, round(np.degrees(positions[3]), 2))
+        ry.insert(0, round(np.degrees(positions[4]), 2))
+        rz.insert(0, round(np.degrees(positions[5]), 2))
+        
+        #finish
+        end = perf_counter()
+        updateLog(f'Forward kinematics calculated (took {round((end-start)*1000, 2)}ms)')
+        if bool(globalsettings['Update']):
+            plotData()
+        if bool(globalsettings['Automate']) and not error:
+            goToFunc()
 
 #set joint data to the home position
 def goHome():
