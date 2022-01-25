@@ -1721,9 +1721,9 @@ def openSettingsWindow():
     )
     lerpresolution = ctk.CTkSlider(
         master=preferencesframe,
-        from_=0,
+        from_=100,
         to=1000,
-        number_of_steps=10,
+        number_of_steps=9,
         width=150
     )
 
