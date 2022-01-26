@@ -1,4 +1,3 @@
-from re import T
 import numpy as np
 from tkinter import *
 from tkinter import messagebox, colorchooser
