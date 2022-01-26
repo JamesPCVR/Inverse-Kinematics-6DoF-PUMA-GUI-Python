@@ -59,15 +59,19 @@ The window you will interact with most
   <summary>Show light mode and colourblind modes</summary>
   
   ![root_light](images/root_light.png?raw=true)
+
   light mode
 
   ![root_protanope](images/root_dark_protanope.png?raw=true)
+
   dark mode protanope
 
   ![root_deuteranope](images/root_dark_deuteranope.png?raw=true)
+
   dark mode deuteranope
 
   ![root_tritanope](images/root_dark_tritanope.png?raw=true)
+
   dark mode tritanope
 
 </details>
@@ -86,15 +90,19 @@ Need to tailor the program to be more like how you want it? settings is the plac
   <summary>Show light mode and colourblind modes</summary>
   
   ![settings_light](images/settings_light.png?raw=true)
+
   light mode
 
   ![settings_protanope](images/settings_dark_protanope.png?raw=true)
+
   dark mode protanope
 
   ![settings_deuteranope](images/settings_dark_deuteranope.png?raw=true)
+
   dark mode deuteranope
 
   ![settings_tritanope](images/settings_dark_tritanope.png?raw=true)
+
   dark mode tritanope
   
 </details>
@@ -114,15 +122,19 @@ Change them to be exactly what you want with this handy window
   <summary>Show light mode and colourblind modes</summary>
   
   ![colours_light](images/colours_light.png?raw=true)
+
   light mode
 
   ![colours_protanope](images/colours_dark_protanope.png?raw=true)
+
   dark mode protanope
 
   ![colours_deuteranope](images/colours_dark_deuteranope.png?raw=true)
+
   dark mode deuteranope
 
   ![colours_tritanope](images/colours_dark_tritanope.png?raw=true)
+
   dark mode tritanope
 
 </details>
@@ -438,7 +450,7 @@ Updated after you either choose a colour or when you click the refresh button an
 
 ## Colour blind modes
 
-Drag the slider to the appropriate colour blind mode and you can preview the new colours. If they do not suit your strength of colour blindness (programs assumes 100% severity) you can change the colours using the selected mode as a starting point.
+Drag the slider to the appropriate colour blind mode and you can preview the new colours. If they do not suit your strength of colour blindness (program assumes 100% severity) you can change the colours using the selected mode as a starting point.
 
 ## Themes
 
